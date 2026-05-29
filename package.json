@@ -1,6 +1,6 @@
 {
-  "name": "uv-render-proxy",
-  "version": "1.1.0",
+  "name": "uv-proxy",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +9,8 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@mercuryworkshop/wisp-js": "^2.0.1",
+    "@titaniumnetwork-dev/ultraviolet": "^1.0.11",
     "@tomphttp/bare-server-node": "^2.0.4",
     "compression": "^1.7.4",
     "express": "^4.19.2",
