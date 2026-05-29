@@ -7,7 +7,6 @@ import crypto from "crypto";
 import fetch from "node-fetch";
 import { createBareServer } from "@tomphttp/bare-server-node";
 import { uvPath } from "@titaniumnetwork-dev/ultraviolet";
-import { server as wisp } from "@mercuryworkshop/wisp-js";
 import { createServer } from "node:http";
 import { fileURLToPath } from "url";
 
