@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: proxy-lite
+    env: node
+    region: tokyo
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "3300"
+      - key: WEBHOOK_URL_LOG
+        sync: false
+      - key: WEBHOOK_URL_NOTIFY
+        sync: false
+      - key: NOTIFY_KEYWORDS
+        value: ""
+      - key: CF_QUICK_TUNNEL
+        value: "false"

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>proxy-lite</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 proxy-lite</h1>
+      <p class="subtitle">Lightweight & Secure Web Proxy</p>
+    </header>
+    <main>
+      <form id="proxy-form">
+        <div class="input-group">
+          <input type="url" id="url-input" placeholder="https://example.com" required pattern="https?://.+" />
+          <button type="submit">Go</button>
+        </div>
+      </form>
+      <div class="info">
+        <details>
+          <summary>ℹ️ 使い方</summary>
+          <ul>
+            <li>URLを入力して「Go」をクリック</li>
+            <li>プロキシ経由でサイトを表示</li>
+            <li>📋 利用ログは管理者に送信（ファイル除く）</li>
+          </ul>
+        </details>
+      </div>
+      <div class="status" id="status"></div>
+    </main>
+    <footer><small>proxy-lite v1.0 • astroidv3 base</small></footer>
+  </div>
+  <script src="/uv/uv.bundle.js"></script>
+  <script src="/uv/uv.config.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

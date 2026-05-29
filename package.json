@@ -1,0 +1,19 @@
+{
+  "name": "proxy-lite",
+  "version": "1.0.0",
+  "description": "Lightweight proxy based on astroidv3 with webhook logging",
+  "type": "module",
+  "engines": { "node": ">=18.0.0" },
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@nebula-services/bare-server-node": "^2.0.4",
+    "@titaniumnetwork-dev/ultraviolet": "^1.0.11",
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "wisp-server-node": "^1.1.7"
+  }
+}
