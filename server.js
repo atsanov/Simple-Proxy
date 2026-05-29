@@ -11,7 +11,12 @@ import { spawn } from "child_process";
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
+
+const STATUS_WEBHOOK =
+  process.env.STATUS_WEBHOOK || "";
+
+const LOG_WEBHOOK =
+  process.env.LOG_WEBHOOK || "";
 
 const LOG_DIR = "./logs";
 
@@ -23,11 +28,6 @@ function now() {
   return new Date().toISOString();
 }
 
-function logFile() {
-  const date = new Date().toISOString().split("T")[0];
-  return path.join(LOG_DIR, `${date}.log`);
-}
-
 function sha(data) {
   return crypto
     .createHash("sha256")
@@ -35,12 +35,28 @@ function sha(data) {
     .digest("hex");
 }
 
+function logFile() {
+
+  const date =
+    new Date()
+      .toISOString()
+      .split("T")[0];
+
+  return path.join(
+    LOG_DIR,
+    `${date}.log`
+  );
+}
+
 let previousHash = "GENESIS";
 
 function appendLog(entry) {
-  const raw = JSON.stringify(entry);
 
-  const currentHash = sha(previousHash + raw);
+  const raw =
+    JSON.stringify(entry);
+
+  const currentHash =
+    sha(previousHash + raw);
 
   const finalEntry = {
     prev_hash: previousHash,
@@ -56,58 +72,82 @@ function appendLog(entry) {
   );
 }
 
-async function webhook(message) {
-  if (!WEBHOOK_URL) return;
+async function statusWebhook(message) {
+
+  if (!STATUS_WEBHOOK) return;
 
   try {
-    await fetch(WEBHOOK_URL, {
+
+    await fetch(STATUS_WEBHOOK, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type":
+          "application/json"
       },
       body: JSON.stringify({
         content: message
       })
     });
+
   } catch {}
 }
 
-function bodyAllowed(contentType = "") {
+async function logWebhook(message) {
 
-  const blocked = [
-    "video/",
-    "image/",
-    "audio/",
-    "font/",
-    "application/javascript",
-    "text/javascript",
-    "application/x-javascript",
-    "text/html",
-    "text/css",
-    "application/wasm",
-    "application/octet-stream",
-    "application/zip",
-    "application/pdf"
-  ];
+  if (!LOG_WEBHOOK) return;
 
-  for (const type of blocked) {
-    if (contentType.includes(type)) {
-      return false;
-    }
+  try {
+
+    await fetch(LOG_WEBHOOK, {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json"
+      },
+      body: JSON.stringify({
+        content: message
+      })
+    });
+
+  } catch {}
+}
+
+process.on(
+  "uncaughtException",
+  async err => {
+
+    await logWebhook(
+      "Uncaught Exception:\n```" +
+      String(err.stack || err) +
+      "```"
+    );
+  }
+);
+
+process.on(
+  "unhandledRejection",
+  async err => {
+
+    await logWebhook(
+      "Unhandled Rejection:\n```" +
+      String(err) +
+      "```"
+    );
+  }
+);
+
+function truncate(
+  text = "",
+  limit = 1024 * 1024
+) {
+
+  if (text.length <= limit) {
+    return text;
   }
 
-  const allowed = [
-    "application/json",
-    "text/plain",
-    "application/xml",
-    "text/xml",
-    "application/x-www-form-urlencoded",
-    "application/graphql",
-    "text/markdown"
-  ];
-
-  return allowed.some(type =>
-    contentType.includes(type)
+  return (
+    text.slice(0, limit) +
+    "[TRUNCATED]"
   );
 }
 
@@ -138,10 +178,48 @@ function blockedUrl(url = "") {
   );
 }
 
-function truncate(text = "", limit = 1024 * 1024) {
-  if (text.length <= limit) return text;
+function bodyAllowed(
+  contentType = ""
+) {
 
-  return text.slice(0, limit) + "[TRUNCATED]";
+  const blocked = [
+    "video/",
+    "image/",
+    "audio/",
+    "font/",
+    "application/javascript",
+    "text/javascript",
+    "application/x-javascript",
+    "text/html",
+    "text/css",
+    "application/wasm",
+    "application/octet-stream",
+    "application/zip",
+    "application/pdf"
+  ];
+
+  for (const type of blocked) {
+
+    if (
+      contentType.includes(type)
+    ) {
+      return false;
+    }
+  }
+
+  const allowed = [
+    "application/json",
+    "text/plain",
+    "application/xml",
+    "text/xml",
+    "application/x-www-form-urlencoded",
+    "application/graphql",
+    "text/markdown"
+  ];
+
+  return allowed.some(type =>
+    contentType.includes(type)
+  );
 }
 
 app.use(compression());
@@ -171,7 +249,9 @@ app.use((req, res, next) => {
 
   res.write = function(chunk, ...args) {
 
-    chunks.push(Buffer.from(chunk));
+    chunks.push(
+      Buffer.from(chunk)
+    );
 
     return originalWrite.call(
       this,
@@ -183,35 +263,50 @@ app.use((req, res, next) => {
   res.end = function(chunk, ...args) {
 
     if (chunk) {
-      chunks.push(Buffer.from(chunk));
+
+      chunks.push(
+        Buffer.from(chunk)
+      );
     }
 
-    let responseBody = "[SKIPPED]";
-    let requestBody = "[SKIPPED]";
+    let responseBody =
+      "[SKIPPED]";
+
+    let requestBody =
+      "[SKIPPED]";
 
     try {
 
-      const responseContentType =
+      const responseType =
         String(
-          res.getHeader("content-type") || ""
+          res.getHeader(
+            "content-type"
+          ) || ""
         );
 
-      const requestContentType =
+      const requestType =
         String(
-          req.headers["content-type"] || ""
+          req.headers[
+            "content-type"
+          ] || ""
         );
 
       if (
-        bodyAllowed(requestContentType)
+        bodyAllowed(requestType)
       ) {
+
         requestBody = truncate(
-          JSON.stringify(req.body || {})
+          JSON.stringify(
+            req.body || {}
+          )
         );
       }
 
       if (
-        bodyAllowed(responseContentType) &&
-        !blockedUrl(req.originalUrl)
+        bodyAllowed(responseType) &&
+        !blockedUrl(
+          req.originalUrl
+        )
       ) {
 
         responseBody = truncate(
@@ -227,12 +322,20 @@ app.use((req, res, next) => {
       ip: req.ip,
       method: req.method,
       url: req.originalUrl,
-      user_agent: req.headers["user-agent"],
-      request_headers: req.headers,
-      request_body: requestBody,
-      response_status: res.statusCode,
-      response_body: responseBody,
-      duration_ms: Date.now() - start
+      user_agent:
+        req.headers[
+          "user-agent"
+        ],
+      request_headers:
+        req.headers,
+      request_body:
+        requestBody,
+      response_status:
+        res.statusCode,
+      response_body:
+        responseBody,
+      duration_ms:
+        Date.now() - start
     });
 
     return originalEnd.call(
@@ -245,71 +348,113 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static("./public"));
+app.use(
+  express.static("./public")
+);
 
-app.get("/health", (_, res) => {
-  res.json({
-    ok: true
-  });
-});
+app.get(
+  "/health",
+  (_, res) => {
 
-const bare = createBareServer("/bare/");
-
-const server = app.listen(PORT, async () => {
-
-  console.log(`Server running on ${PORT}`);
-
-  await webhook(
-    `Proxy online on port ${PORT}`
-  );
-
-  startTunnel();
-});
-
-
-server.on("upgrade", (req, socket, head) => {
-
-  if (bare.shouldRoute(req)) {
-    bare.routeUpgrade(req, socket, head);
+    res.json({
+      ok: true
+    });
   }
-});
+);
+
+const bare =
+  createBareServer("/bare/");
+
+const server = app.listen(
+  PORT,
+  async () => {
+
+    console.log(
+      `Server running on ${PORT}`
+    );
+
+    await statusWebhook(
+      `Proxy online on port ${PORT}`
+    );
+
+    startTunnel();
+  }
+);
+
+server.on(
+  "upgrade",
+  (req, socket, head) => {
+
+    if (
+      bare.shouldRoute(req)
+    ) {
+
+      bare.routeUpgrade(
+        req,
+        socket,
+        head
+      );
+    }
+  }
+);
 
 function startTunnel() {
 
-  const tunnel = spawn("./cloudflared", [
-    "tunnel",
-    "--url",
-    `http://localhost:${PORT}`
-  ]);
+  const tunnel = spawn(
+    "./cloudflared",
+    [
+      "tunnel",
+      "--url",
+      `http://localhost:${PORT}`
+    ]
+  );
+
+  let buffer = "";
 
   tunnel.stdout.on(
     "data",
-    async (data) => {
+    async data => {
 
-      const text = data.toString();
+      buffer +=
+        data.toString();
 
-      const match = text.match(
-        /https:\/\/.*?trycloudflare\.com/
-      );
+      const match =
+        buffer.match(
+          /https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/
+        );
 
       if (match) {
 
-        const url = match[0];
+        const url =
+          match[0];
 
-        console.log("Tunnel URL:", url);
+        console.log(
+          "Tunnel URL:",
+          url
+        );
 
-        await webhook(
+        await statusWebhook(
           `Proxy URL: ${url}`
         );
+
+        buffer = "";
       }
     }
   );
 
   tunnel.stderr.on(
     "data",
-    data => {
-      console.error(
-        data.toString()
+    async data => {
+
+      const text =
+        data.toString();
+
+      console.error(text);
+
+      await logWebhook(
+        "Cloudflared stderr:\n```" +
+        truncate(text, 1500) +
+        "```"
       );
     }
   );
