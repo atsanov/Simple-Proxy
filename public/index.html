@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #11111a;
+      --border: #1e1e2e;
+      --accent: #7c5cfc;
+      --accent2: #fc5c7d;
+      --text: #e2e2f0;
+      --muted: #5a5a7a;
+      --glow: rgba(124, 92, 252, 0.15);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Grid noise background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(124,92,252,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,92,252,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Radial glow */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(124,92,252,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      gap: 2rem;
+    }
+
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: fadeIn 0.6s ease both;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: -1.5rem;
+      animation: fadeIn 0.6s 0.1s ease both;
+    }
+
+    .search-wrapper {
+      width: 100%;
+      max-width: 560px;
+      animation: slideUp 0.5s 0.15s ease both;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0 1rem;
+      gap: 0.75rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--glow), 0 0 30px var(--glow);
+    }
+
+    .search-icon {
+      color: var(--muted);
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+
+    #url-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.85rem;
+      padding: 1rem 0;
+      min-width: 0;
+    }
+
+    #url-input::placeholder { color: var(--muted); }
+
+    .go-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .go-btn:hover { opacity: 0.88; transform: scale(1.02); }
+    .go-btn:active { transform: scale(0.97); }
+
+    .hints {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeIn 0.5s 0.25s ease both;
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      font-family: 'Space Mono', monospace;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.65rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+
+    .hint:hover { color: var(--accent); border-color: var(--accent); }
+
+    .status-bar {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #3ddc84;
+      animation: pulse 2s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* SW registration feedback */
+    .sw-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(61,220,132,0.1);
+      color: #3ddc84;
+      border: 1px solid rgba(61,220,132,0.2);
+      animation: fadeIn 1s 1s ease both;
+    }
+
+    .sw-badge.error {
+      background: rgba(252,92,125,0.1);
+      color: var(--accent2);
+      border-color: rgba(252,92,125,0.2);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo">// portal</div>
+  <div class="subtitle">ultraviolet proxy</div>
+
+  <div class="search-wrapper">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input id="url-input" type="text" placeholder="search or enter a URL..." autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="go-btn" onclick="navigate()">GO</button>
+    </div>
+  </div>
+
+  <div class="hints">
+    <span class="hint" onclick="setUrl('https://google.com')">google</span>
+    <span class="hint" onclick="setUrl('https://youtube.com')">youtube</span>
+    <span class="hint" onclick="setUrl('https://reddit.com')">reddit</span>
+    <span class="hint" onclick="setUrl('https://discord.com')">discord</span>
+    <span class="hint" onclick="setUrl('https://twitter.com')">twitter</span>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span class="dot"></span>
+  <span id="sw-status">connecting...</span>
+</div>
+
+<script>
+  // ── Service Worker registration ───────────────────────────
+  const swStatus = document.getElementById('sw-status');
+
+  async function registerSW() {
+    if (!navigator.serviceWorker) {
+      swStatus.textContent = 'service workers unsupported';
+      return;
+    }
+    try {
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      swStatus.textContent = 'ready';
+    } catch (e) {
+      swStatus.textContent = 'sw error';
+      console.error('SW registration failed:', e);
+    }
+  }
+
+  // ── UV config ─────────────────────────────────────────────
+  // Loaded via /uv/uv.config.js (sets window.__uv$config)
+  // and /uv/uv.bundle.js
+
+  // ── Navigation ────────────────────────────────────────────
+  function setUrl(url) {
+    document.getElementById('url-input').value = url;
+    document.getElementById('url-input').focus();
+  }
+
+  function navigate() {
+    const input = document.getElementById('url-input').value.trim();
+    if (!input) return;
+
+    let url = input;
+
+    // If it doesn't look like a URL, treat it as a search
+    if (!url.match(/^https?:\/\//i)) {
+      if (url.includes('.') && !url.includes(' ')) {
+        url = 'https://' + url;
+      } else {
+        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+      }
+    }
+
+    // Encode and navigate via UV
+    if (window.__uv$config && window.__uv$config.encodeUrl) {
+      const encoded = __uv$config.encodeUrl(url);
+      window.location.href = __uv$config.prefix + encoded;
+    } else {
+      // Fallback: direct (won't proxy but won't hard-fail)
+      window.location.href = url;
+    }
+  }
+
+  // Enter key
+  document.getElementById('url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') navigate();
+  });
+
+  // Init
+  registerSW();
+</script>
+
+<!-- UV scripts must load after DOM -->
+<script src="/uv/uv.bundle.js"></script>
+<script src="/uv/uv.config.js"></script>
+
+</body>
+</html>
