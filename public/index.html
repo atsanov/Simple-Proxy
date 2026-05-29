@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Filtered Proxy</title>
+
+<style>
+body {
+  background: #111;
+  color: white;
+  font-family: sans-serif;
+  padding: 30px;
+}
+
+input {
+  width: 100%;
+  padding: 15px;
+  border-radius: 8px;
+  border: none;
+  font-size: 18px;
+}
+
+button {
+  margin-top: 15px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Filtered Proxy</h1>
+
+<p>
+Text/API focused logging proxy scaffold.
+</p>
+
+<input id="url" placeholder="https://example.com">
+
+<button onclick="go()">
+Open
+</button>
+
+<script>
+function go() {
+  const input =
+    document.getElementById("url").value;
+
+  if (!input) return;
+
+  location.href =
+    "/bare/" + input;
+}
+</script>
+
+</body>
+</html>
