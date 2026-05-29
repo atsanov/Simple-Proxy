@@ -9,6 +9,10 @@ import { createBareServer } from "@tomphttp/bare-server-node";
 import { uvPath } from "@titaniumnetwork-dev/ultraviolet";
 import { createServer } from "node:http";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
+import { pipeline } from "stream/promises";
+import axios from "axios";
+import zlib from "zlib";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicPath = path.join(__dirname, "public");
@@ -63,8 +67,7 @@ function bodyAllowed(contentType = "") {
     "text/javascript","application/x-javascript","text/html","text/css",
     "application/wasm","application/octet-stream","application/zip","application/pdf"];
   for (const t of blocked) if (contentType.includes(t)) return false;
-  const allowed = ["application/json","text/plain","application/xml","text/xml",
-    "application/graphql","application/x-www-form-urlencoded","text/markdown"];
+  const allowed = ["application/json","text/plain","application/xml","text/markdown"];
   return allowed.some(t => contentType.includes(t));
 }
 
@@ -84,7 +87,7 @@ app.use(rateLimit({ windowMs: 60 * 1000, max: 500 }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// Request/response logger (from Simple-Proxy)
+// Request/response logger
 app.use((req, res, next) => {
   const start = Date.now();
   const chunks = [];
@@ -128,7 +131,7 @@ app.get("/health", (_, res) => res.json({ ok: true }));
 // ── Bare server (UV proxy transport) ─────────────────────────
 const bare = createBareServer("/bare/");
 
-// ── HTTP server with wisp support ────────────────────────────
+// ── HTTP server ──────────────────────────────────────────────
 const server = createServer();
 
 server.on("request", (req, res) => {
@@ -143,11 +146,80 @@ server.on("upgrade", (req, socket, head) => {
   if (bare.shouldRoute(req)) {
     bare.routeUpgrade(req, socket, head);
   } else {
-    wisp.routeRequest(req, socket, head);
+    socket.destroy();
   }
 });
 
+// ── Cloudflare Tunnel Setup ──────────────────────────────────
+async function downloadCloudflared() {
+  const binPath = path.join(__dirname, "cloudflared");
+  if (fs.existsSync(binPath)) return binPath;
+
+  console.log("Downloading cloudflared...");
+  const arch = process.arch === 'arm64' ? 'arm64' : 'amd64';
+  const url = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}`;
+  
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream'
+    });
+    
+    const writer = fs.createWriteStream(binPath);
+    await pipeline(response.data, writer);
+    fs.chmodSync(binPath, '755');
+    console.log("cloudflared downloaded successfully.");
+    return binPath;
+  } catch (error) {
+    console.error("Failed to download cloudflared:", error.message);
+    return null;
+  }
+}
+
+function startTunnel(port) {
+  downloadCloudflared().then(binPath => {
+    if (!binPath) {
+      console.log("Skipping tunnel (cloudflared not available)");
+      return;
+    }
+
+    const tunnelProcess = spawn(binPath, ["tunnel", "--url", `http://localhost:${port}`], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    tunnelProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log(output);
+      
+      // Extract trycloudflare.com URL
+      const match = output.match(/https:\/\/[^\s]+\.trycloudflare\.com/);
+      if (match) {
+        const tunnelUrl = match[0];
+        console.log(`Tunnel URL: ${tunnelUrl}`);
+        sendWebhook(STATUS_WEBHOOK, `🚀 Proxy Online!\n\nMain URL: https://simple-proxy-wbrm.onrender.com\nTunnel URL: ${tunnelUrl}`);
+      }
+    });
+
+    tunnelProcess.stderr.on('data', (data) => {
+      console.error(`cloudflared stderr: ${data}`);
+    });
+
+    tunnelProcess.on('close', (code) => {
+      console.log(`cloudflared process exited with code ${code}`);
+    });
+  });
+}
+
+// ── Start Server ─────────────────────────────────────────────
 server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
-  await sendWebhook(STATUS_WEBHOOK, `Proxy online on port ${PORT}`);
+  
+  // Start Cloudflare Tunnel after a short delay
+  setTimeout(() => startTunnel(PORT), 2000);
+  
+  // Initial webhook without tunnel URL (will be updated later)
+  if (STATUS_WEBHOOK) {
+    await sendWebhook(STATUS_WEBHOOK, `🚀 Server started on port ${PORT}. Waiting for Tunnel URL...`);
+  }
 });
