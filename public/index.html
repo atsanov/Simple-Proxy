@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Simple Proxy</title>
+<title>Filtered Proxy</title>
 
 <style>
 body {
@@ -10,12 +10,6 @@ body {
   color: white;
   font-family: sans-serif;
   padding: 30px;
-  margin: 0;
-}
-
-.container {
-  max-width: 800px;
-  margin: 0 auto;
 }
 
 input {
@@ -24,7 +18,6 @@ input {
   border-radius: 8px;
   border: none;
   font-size: 18px;
-  box-sizing: border-box;
 }
 
 button {
@@ -33,73 +26,34 @@ button {
   border: none;
   border-radius: 8px;
   font-size: 18px;
-  cursor: pointer;
-  background: #007bff;
-  color: white;
-}
-
-button:hover {
-  background: #0056b3;
-}
-
-.info {
-  margin-top: 20px;
-  padding: 15px;
-  background: #222;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #aaa;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
-  <h1>Simple Proxy</h1>
+<h1>Filtered Proxy</h1>
 
-  <p>
-    Ultraviolet プロキシを使用して、Web サイトを安全に閲覧できます。
-  </p>
+<p>
+Text/API focused logging proxy scaffold.
+</p>
 
-  <input id="url" placeholder="https://example.com" value="https://example.com">
+<input id="url" placeholder="https://example.com">
 
-  <button onclick="go()">
-    開く
-  </button>
+<button onclick="go()">
+Open
+</button>
 
-  <div class="info">
-    <p><strong>使い方:</strong> URL を入力して「開く」ボタンをクリックしてください。</p>
-    <p>このプロキシはテキスト/API 中心のログ記録を行います。</p>
-  </div>
-</div>
-
-<script src="/uv.bundle.js"></script>
-<script src="/uv.config.js"></script>
 <script>
 function go() {
-  const input = document.getElementById("url").value;
+  const input =
+    document.getElementById("url").value;
 
   if (!input) return;
 
-  // UV コーデックを使用して URL をエンコード
-  let url = input;
-  if (!/^https?:\/\//i.test(url)) {
-    url = 'https://' + url;
-  }
-
-  const encodedUrl = __uv$config.encodeUrl(url);
-  
-  // UV サービスワーカーが処理するパスにリダイレクト
-  location.href = __uv$config.prefix + encodedUrl;
+  location.href =
+    "/bare/" + input;
 }
-
-// Enter キーでも送信可能に
-document.getElementById("url").addEventListener("keypress", function(event) {
-  if (event.key === "Enter") {
-    go();
-  }
-});
 </script>
 
 </body>
