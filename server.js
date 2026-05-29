@@ -10,7 +10,7 @@ import { spawn } from "child_process";
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 const STATUS_WEBHOOK =
   process.env.STATUS_WEBHOOK || "";
@@ -29,6 +29,7 @@ function now() {
 }
 
 function sha(data) {
+
   return crypto
     .createHash("sha256")
     .update(data)
@@ -89,7 +90,13 @@ async function statusWebhook(message) {
       })
     });
 
-  } catch {}
+  } catch (err) {
+
+    console.error(
+      "STATUS WEBHOOK ERROR:",
+      err
+    );
+  }
 }
 
 async function logWebhook(message) {
@@ -109,15 +116,23 @@ async function logWebhook(message) {
       })
     });
 
-  } catch {}
+  } catch (err) {
+
+    console.error(
+      "LOG WEBHOOK ERROR:",
+      err
+    );
+  }
 }
 
 process.on(
   "uncaughtException",
   async err => {
 
+    console.error(err);
+
     await logWebhook(
-      "Uncaught Exception:\n```" +
+      "Uncaught Exception\n```" +
       String(err.stack || err) +
       "```"
     );
@@ -128,8 +143,10 @@ process.on(
   "unhandledRejection",
   async err => {
 
+    console.error(err);
+
     await logWebhook(
-      "Unhandled Rejection:\n```" +
+      "Unhandled Rejection\n```" +
       String(err) +
       "```"
     );
@@ -147,7 +164,7 @@ function truncate(
 
   return (
     text.slice(0, limit) +
-    "[TRUNCATED]"
+    "\n[TRUNCATED]"
   );
 }
 
@@ -160,12 +177,12 @@ function blockedUrl(url = "") {
     ".jpeg",
     ".gif",
     ".webp",
-    ".wasm",
+    ".svg",
+    ".ico",
     ".css",
     ".js",
     ".mjs",
-    ".ico",
-    ".svg",
+    ".wasm",
     ".woff",
     ".woff2",
     ".ttf",
@@ -212,8 +229,8 @@ function bodyAllowed(
     "text/plain",
     "application/xml",
     "text/xml",
-    "application/x-www-form-urlencoded",
     "application/graphql",
+    "application/x-www-form-urlencoded",
     "text/markdown"
   ];
 
@@ -244,51 +261,63 @@ app.use((req, res, next) => {
 
   const chunks = [];
 
-  const originalWrite = res.write;
-  const originalEnd = res.end;
+  const originalWrite =
+    res.write.bind(res);
 
-  res.write = function(chunk, ...args) {
+  const originalEnd =
+    res.end.bind(res);
 
-    chunks.push(
-      Buffer.from(chunk)
-    );
+  res.write = (
+    chunk,
+    ...args
+  ) => {
 
-    return originalWrite.call(
-      this,
+    try {
+
+      chunks.push(
+        Buffer.from(chunk)
+      );
+
+    } catch {}
+
+    return originalWrite(
       chunk,
       ...args
     );
   };
 
-  res.end = function(chunk, ...args) {
-
-    if (chunk) {
-
-      chunks.push(
-        Buffer.from(chunk)
-      );
-    }
-
-    let responseBody =
-      "[SKIPPED]";
-
-    let requestBody =
-      "[SKIPPED]";
+  res.end = (
+    chunk,
+    ...args
+  ) => {
 
     try {
 
-      const responseType =
-        String(
-          res.getHeader(
-            "content-type"
-          ) || ""
+      if (chunk) {
+
+        chunks.push(
+          Buffer.from(chunk)
         );
+      }
+
+      let requestBody =
+        "[SKIPPED]";
+
+      let responseBody =
+        "[SKIPPED]";
 
       const requestType =
         String(
           req.headers[
             "content-type"
           ] || ""
+        );
+
+      const responseType =
+        String(
+          res.getHeader(
+            "content-type"
+          ) || ""
         );
 
       if (
@@ -315,31 +344,36 @@ app.use((req, res, next) => {
         );
       }
 
-    } catch {}
+      appendLog({
+        time: now(),
+        ip: req.ip,
+        method: req.method,
+        url: req.originalUrl,
+        user_agent:
+          req.headers[
+            "user-agent"
+          ],
+        request_headers:
+          req.headers,
+        request_body:
+          requestBody,
+        response_status:
+          res.statusCode,
+        response_body:
+          responseBody,
+        duration_ms:
+          Date.now() - start
+      });
 
-    appendLog({
-      time: now(),
-      ip: req.ip,
-      method: req.method,
-      url: req.originalUrl,
-      user_agent:
-        req.headers[
-          "user-agent"
-        ],
-      request_headers:
-        req.headers,
-      request_body:
-        requestBody,
-      response_status:
-        res.statusCode,
-      response_body:
-        responseBody,
-      duration_ms:
-        Date.now() - start
-    });
+    } catch (err) {
 
-    return originalEnd.call(
-      this,
+      console.error(
+        "LOGGING ERROR:",
+        err
+      );
+    }
+
+    return originalEnd(
       chunk,
       ...args
     );
@@ -411,49 +445,84 @@ function startTunnel() {
 
   let buffer = "";
 
+  function handleTunnelOutput(data) {
+
+    const text =
+      data.toString();
+
+    buffer += text;
+
+    console.log(text);
+
+    const match =
+      buffer.match(
+        /https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/
+      );
+
+    if (match) {
+
+      const url =
+        match[0];
+
+      console.log(
+        "Tunnel URL:",
+        url
+      );
+
+      statusWebhook(
+        `Proxy URL: ${url}`
+      );
+
+      buffer = "";
+    }
+  }
+
   tunnel.stdout.on(
     "data",
-    async data => {
-
-      buffer +=
-        data.toString();
-
-      const match =
-        buffer.match(
-          /https:\/\/[a-zA-Z0-9.-]+\.trycloudflare\.com/
-        );
-
-      if (match) {
-
-        const url =
-          match[0];
-
-        console.log(
-          "Tunnel URL:",
-          url
-        );
-
-        await statusWebhook(
-          `Proxy URL: ${url}`
-        );
-
-        buffer = "";
-      }
-    }
+    handleTunnelOutput
   );
 
   tunnel.stderr.on(
     "data",
     async data => {
 
+      handleTunnelOutput(data);
+
       const text =
         data.toString();
 
-      console.error(text);
+      await logWebhook(
+        "Cloudflared stderr\n```" +
+        truncate(text, 1500) +
+        "```"
+      );
+    }
+  );
+
+  tunnel.on(
+    "close",
+    async code => {
+
+      console.log(
+        "Tunnel closed:",
+        code
+      );
 
       await logWebhook(
-        "Cloudflared stderr:\n```" +
-        truncate(text, 1500) +
+        `Tunnel closed: ${code}`
+      );
+    }
+  );
+
+  tunnel.on(
+    "error",
+    async err => {
+
+      console.error(err);
+
+      await logWebhook(
+        "Tunnel process error\n```" +
+        String(err) +
         "```"
       );
     }
