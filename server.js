@@ -266,14 +266,6 @@ const server = app.listen(PORT, async () => {
   startTunnel();
 });
 
-server.on("request", (req, res) => {
-
-  if (bare.shouldRoute(req)) {
-    bare.routeRequest(req, res);
-  } else {
-    app(req, res);
-  }
-});
 
 server.on("upgrade", (req, socket, head) => {
 
